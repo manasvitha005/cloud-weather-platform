@@ -1,0 +1,115 @@
+// Prisma Schema for Cloud Weather Monitoring Platform
+// Local SQLite configuration with PostgreSQL Cloud SQL production schema parity
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Location {
+  id             String          @id @default(cuid())
+  name           String
+  country        String
+  latitude       Float
+  longitude      Float
+  timezone       String          @default("UTC")
+  elevation      Float?
+  isActive       Boolean         @default(true)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  
+  weatherRecords WeatherRecord[]
+  weatherAlerts  WeatherAlert[]
+
+  @@unique([latitude, longitude])
+  @@index([isActive])
+  @@index([name])
+  @@map("locations")
+}
+
+model WeatherRecord {
+  id                   String   @id @default(cuid())
+  locationId           String
+  recordedAt           DateTime
+  temperature          Float
+  feelsLikeTemperature Float
+  humidity             Float
+  windSpeed            Float
+  windDirection        Float?
+  precipitation        Float    @default(0.0)
+  pressure             Float?
+  weatherCode          Int
+  conditionText        String?
+  uvIndex              Float?
+  visibility           Float?
+  createdAt            DateTime @default(now())
+
+  location Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+
+  @@unique([locationId, recordedAt])
+  @@index([locationId, recordedAt])
+  @@index([recordedAt])
+  @@map("weather_records")
+}
+
+model AlertRule {
+  id          String   @id @default(cuid())
+  metric      String   // TEMPERATURE_HIGH, TEMPERATURE_LOW, PRECIPITATION_HIGH, WIND_HIGH, HUMIDITY_HIGH
+  operator    String   @default("GREATER_THAN") // GREATER_THAN, LESS_THAN, EQUALS
+  threshold   Float
+  severity    String   @default("WARNING") // INFO, WARNING, CRITICAL
+  isEnabled   Boolean  @default(true)
+  title       String
+  description String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([metric, isEnabled])
+  @@map("alert_rules")
+}
+
+model WeatherAlert {
+  id          String    @id @default(cuid())
+  locationId  String
+  type        String    // HIGH_TEMPERATURE, HEAVY_PRECIPITATION, HIGH_WIND, HIGH_HUMIDITY, EXTREME_COLD
+  severity    String    // INFO, WARNING, CRITICAL
+  title       String
+  message     String
+  threshold   Float
+  actualValue Float
+  triggeredAt DateTime  @default(now())
+  resolvedAt  DateTime?
+  status      String    @default("ACTIVE") // ACTIVE, RESOLVED, ACKNOWLEDGED
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  location Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+
+  @@index([locationId, status])
+  @@index([triggeredAt])
+  @@index([status])
+  @@map("weather_alerts")
+}
+
+model CollectionRun {
+  id                 String    @id @default(cuid())
+  startedAt          DateTime  @default(now())
+  completedAt        DateTime?
+  status             String    @default("RUNNING") // SUCCESS, PARTIAL_FAILURE, FAILED, RUNNING
+  triggerType        String    @default("SCHEDULED") // SCHEDULED, MANUAL, SYSTEM
+  locationsProcessed Int       @default(0)
+  recordsCreated     Int       @default(0)
+  alertsTriggered    Int       @default(0)
+  durationMs         Int?
+  errorMessage       String?
+  logs               String?
+  createdAt          DateTime  @default(now())
+
+  @@index([startedAt])
+  @@index([status])
+  @@map("collection_runs")
+}

@@ -1,0 +1,44 @@
+steps:
+  # 1. Build the container image
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/cloud-weather-platform:$COMMIT_SHA'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/cloud-weather-platform:latest'
+      - '.'
+
+  # 2. Push container image to Google Container Registry / Artifact Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'gcr.io/$PROJECT_ID/cloud-weather-platform:$COMMIT_SHA']
+
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'gcr.io/$PROJECT_ID/cloud-weather-platform:latest']
+
+  # 3. Deploy container image to Google Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'cloud-weather-platform'
+      - '--image'
+      - 'gcr.io/$PROJECT_ID/cloud-weather-platform:$COMMIT_SHA'
+      - '--region'
+      - 'us-central1'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+      - '--port'
+      - '8080'
+      - '--memory'
+      - '1Gi'
+      - '--cpu'
+      - '1'
+      - '--set-secrets'
+      - 'DATABASE_URL=WEATHER_DATABASE_URL:latest,CRON_SECRET=WEATHER_CRON_SECRET:latest'
+
+images:
+  - 'gcr.io/$PROJECT_ID/cloud-weather-platform:$COMMIT_SHA'
+  - 'gcr.io/$PROJECT_ID/cloud-weather-platform:latest'
